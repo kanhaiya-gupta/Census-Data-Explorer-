@@ -1,66 +1,88 @@
-# Census Data Explorer
 
-A Python project to explore and analyze data from a PostgreSQL census database.
+# 🧮 Census ETL Pipeline
 
-## Setup
-1. Install dependencies: `pip install -r docs/requirements.txt`
-2. Configure the database URL in `src/config.py`.
-3. Run the app: `python main.py`
+This project implements a complete ETL (Extract, Transform, Load) pipeline for analyzing U.S. Census data using Python, SQLAlchemy, Pandas, and Matplotlib. It connects to a SQLite database, performs data cleaning and transformation, updates the database, and generates a markdown report with visualizations.
 
-## Features
-- Connect to a PostgreSQL database.
-- Query and analyze census data.
-- Visualize results (optional).
+---
 
+## 📁 Project Structure
 
+```
+.
+├── data/
+│   ├── census.csv
+│   └── census.sqlite
+├── census_report.md
+├── pop_change_plot.png
+├── etl_pipeline.py
+└── README.md
+```
 
+---
 
-This complete implementation includes:
+## ⚙️ Features
 
-1. **Full Features**:
-   - Comprehensive error handling with try/except blocks
-   - Detailed logging throughout the pipeline
-   - Proper type conversion for database insertion
-   - Visualization generation using matplotlib
-   - Complete artifact generation with analysis results
+- **Extract:** Loads data from a SQLite database and CSV file.
+- **Transform:** Performs calculations including:
+  - Average age by gender
+  - Percentage of female population by state
+  - Top 10 states by population change
+- **Load:**
+  - Inserts transformed data back into the database
+  - Updates specific fields
+  - Generates a markdown report
+  - Creates a bar chart visualization
 
-2. **Extract Phase**:
-   - Validates file existence
-   - Reflects database tables
-   - Loads CSV data with proper column names
-   - Returns pandas DataFrame
+---
 
-3. **Transform Phase**:
-   - Performs three key analyses:
-     - Average age by gender
-     - Percentage female by state
-     - Top 10 states by population change
-   - Converts DataFrame to list of dictionaries with proper typing
-   - Returns both analysis results and prepared data
+## 🛠️ Technologies Used
 
-4. **Load Phase**:
-   - Creates new table if needed
-   - Inserts CSV data into census table
-   - Updates state_fact table
-   - Generates detailed report with formatted results
-   - Creates visualization of population changes
-   - Produces properly formatted artifact
+- Python 3.x
+- Pandas
+- SQLAlchemy
+- SQLite
+- Matplotlib
+- Logging
 
-5. **Execution**:
-   - Runs all phases in sequence
-   - Manages database connection lifecycle
-   - Provides detailed logging output
+---
 
-To run this code:
-1. Ensure all dependencies are installed (pandas, sqlalchemy, matplotlib)
-2. Verify the file paths exist and are accessible
-3. Execute the script directly
+## 🧪 How to Run
 
-The code will:
-- Log all operations
-- Generate a population change plot (pop_change_plot.png)
-- Create an artifact with the analysis report
-- Handle any errors gracefully
-- Clean up resources properly
+1. **Install dependencies:**
 
-The artifact contains a comprehensive report with all analysis results formatted in markdown, meeting the specified requirements for the xaiArtifact tag structure.
+   ```bash
+   pip install pandas sqlalchemy matplotlib
+   ```
+
+2. **Prepare the data:**
+   - Place `census.csv` and `census.sqlite` inside the `data/` directory.
+
+3. **Run the pipeline:**
+
+   ```bash
+   python etl_pipeline.py
+   ```
+
+4. **Output:**
+   - `census_report.md`: Markdown report with insights
+   - `pop_change_plot.png`: Chart showing top states by population change
+
+---
+
+## 📊 Sample Output
+
+- Average age by gender
+- Percentage of female population in each state
+- Top 10 states with highest population growth
+- Bar chart visualization of population change
+
+---
+
+## 🚨 Error Handling
+
+- Graceful handling of:
+  - Missing files
+  - Invalid database connections
+  - Data formatting errors
+
+Logs are generated to help debug issues efficiently.
