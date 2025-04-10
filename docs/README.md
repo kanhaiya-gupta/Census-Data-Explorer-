@@ -14,39 +14,53 @@ A Python project to explore and analyze data from a PostgreSQL census database.
 
 
 
-This ETL pipeline reorganization includes:
 
-1. **Extract Phase**:
-   - Connects to SQLite databases
-   - Reflects existing tables
-   - Reads data from CSV file
-   - Verifies file existence
+This complete implementation includes:
 
-2. **Transform Phase**:
-   - Calculates average age by gender
-   - Computes percentage of women by state
-   - Determines top 10 states by population change
-   - Prepares CSV data for loading
-   - Returns transformed data in a structured format
+1. **Full Features**:
+   - Comprehensive error handling with try/except blocks
+   - Detailed logging throughout the pipeline
+   - Proper type conversion for database insertion
+   - Visualization generation using matplotlib
+   - Complete artifact generation with analysis results
 
-3. **Load Phase**:
-   - Creates a new table for data storage
-   - Loads CSV data into census table
-   - Generates a report artifact with analysis results
-   - Updates existing tables with new information
+2. **Extract Phase**:
+   - Validates file existence
+   - Reflects database tables
+   - Loads CSV data with proper column names
+   - Returns pandas DataFrame
 
-Key Features:
-- Organized as a class for better structure and reusability
-- Error handling with try/except blocks
-- Proper resource management with connection closing
-- Maintains original functionality while adding structure
-- Generates an artifact with analysis results
-- Follows the artifact tagging requirements
-- Includes all necessary imports at the top
+3. **Transform Phase**:
+   - Performs three key analyses:
+     - Average age by gender
+     - Percentage female by state
+     - Top 10 states by population change
+   - Converts DataFrame to list of dictionaries with proper typing
+   - Returns both analysis results and prepared data
 
-To use this pipeline:
-1. Ensure the specified file paths exist
-2. Make sure required libraries (pandas, sqlalchemy, matplotlib) are installed
-3. Run the script, and it will execute the complete ETL process
+4. **Load Phase**:
+   - Creates new table if needed
+   - Inserts CSV data into census table
+   - Updates state_fact table
+   - Generates detailed report with formatted results
+   - Creates visualization of population changes
+   - Produces properly formatted artifact
 
-The pipeline preserves the core functionality from your original code while providing a more structured and maintainable approach to data processing.
+5. **Execution**:
+   - Runs all phases in sequence
+   - Manages database connection lifecycle
+   - Provides detailed logging output
+
+To run this code:
+1. Ensure all dependencies are installed (pandas, sqlalchemy, matplotlib)
+2. Verify the file paths exist and are accessible
+3. Execute the script directly
+
+The code will:
+- Log all operations
+- Generate a population change plot (pop_change_plot.png)
+- Create an artifact with the analysis report
+- Handle any errors gracefully
+- Clean up resources properly
+
+The artifact contains a comprehensive report with all analysis results formatted in markdown, meeting the specified requirements for the xaiArtifact tag structure.
