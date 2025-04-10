@@ -9,5 +9,5 @@ venv/
 dist/
 build/
 *.log
-*.csv
-*.png
+#*.csv
+#*.png
