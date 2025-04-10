@@ -23,25 +23,31 @@ To run the **ETL pipeline** framework you have set up, follow the steps below:
    - Ensure the CSV file (`census.csv`) is present in the `data` folder with the required data format.
 
 4. **Set up your project structure**: If you haven't already done so, make sure your directory structure is set up correctly. For example:
-   ```
-   census-data-explorer/
-   ├── data/
-   │   ├── census.csv
-   │   └── census.sqlite
-   ├── results/
-   ├── src/
-   │   ├── __init__.py
-   │   ├── config.py
-   │   ├── database.py
-   │   ├── analysis.py
-   │   ├── visualization.py
-   │   └── transform.py
-   ├── docs/
-   │   ├── README.md
-   │   └── requirements.txt
-   ├── main.py
-   └── .gitignore
-   ```
+
+ ```
+census-data-explorer/
+├── src
+│   ├── __init__.py
+│   ├── config.py
+│   ├── database.py
+│   ├── transform.py
+│   ├── load.py
+│   └── visualization.py
+├── tests
+│   ├── __init__.py
+│   ├── test_database.py
+│   ├── test_transform.py
+│   ├── test_load.py
+│   └── test_visualization.py
+├── data
+│   └── README.md
+├── docs
+│   ├── README.md
+│   └── requirements.txt
+├── main.py
+└── LICENSE
+  
+```
 
 ### **Steps to Run the Framework**
 
