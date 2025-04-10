@@ -5,82 +5,102 @@ This project implements a complete ETL (Extract, Transform, Load) pipeline for a
 
 ---
 
-## 📁 Project Structure
+To run the **ETL pipeline** framework you have set up, follow the steps below:
 
-```
-.
-.
-├── src/
-│   ├── __init__.py             # Init for package
-│   ├── config.py               # DB configuration
-│   ├── database.py             # Connection logic
-│   ├── analysis.py             # Data processing/transform logic
-│   └── visualization.py        # Charting and plotting
-├── tests/
-│   ├── __init__.py
-│   ├── test_database.py        # Unit tests for DB connection
-│   └── test_analysis.py        # Unit tests for analysis
-├── data/
-│   └── README.md               # Notes on data format & usage
-├── docs/
-│   ├── README.md               # Project overview
-│   └── requirements.txt        # Dependencies
-├── main.py                     # Entry point for running the pipeline
-├── .gitignore
-├── LICENSE
-└── README.md                   
-```
-
----
-
-## ⚙️ Features
-
-- **Extract:** Loads data from a SQLite database and CSV file.
-- **Transform:** Performs calculations including:
-  - Average age by gender
-  - Percentage of female population by state
-  - Top 10 states by population change
-- **Load:**
-  - Inserts transformed data back into the database
-  - Updates specific fields
-  - Generates a markdown report
-  - Creates a bar chart visualization
-
----
-
-## 🛠️ Technologies Used
-
-- Python 3.x
-- Pandas
-- SQLAlchemy
-- SQLite
-- Matplotlib
-- Logging
-
----
-
-## 🧪 How to Run
-
-1. **Install dependencies:**
-
+### **Prerequisites**
+1. **Install Python**: Ensure you have Python 3.x installed on your machine. You can check by running:
    ```bash
-   pip install pandas sqlalchemy matplotlib
+   python --version
    ```
 
-2. **Prepare the data:**
-   - Place `census.csv` and `census.sqlite` inside the `data/` directory.
-
-3. **Run the pipeline:**
-
+2. **Install Dependencies**: Ensure you have the required dependencies listed in the `requirements.txt` file installed. If you haven't created one yet, you can use the following commands to install them:
    ```bash
-   python etl_pipeline.py
+   pip install -r docs/requirements.txt
    ```
 
-4. **Output:**
-   - `census_report.md`: Markdown report with insights
-   - `pop_change_plot.png`: Chart showing top states by population change
+3. **Ensure Database and Data Files**: 
+   - Ensure the database file (`census.sqlite`) exists in the correct directory (under `data/census.sqlite`).
+   - Ensure the CSV file (`census.csv`) is present in the `data` folder with the required data format.
+
+4. **Set up your project structure**: If you haven't already done so, make sure your directory structure is set up correctly. For example:
+   ```
+   census-data-explorer/
+   ├── data/
+   │   ├── census.csv
+   │   └── census.sqlite
+   ├── results/
+   ├── src/
+   │   ├── __init__.py
+   │   ├── config.py
+   │   ├── database.py
+   │   ├── analysis.py
+   │   ├── visualization.py
+   │   └── transform.py
+   ├── docs/
+   │   ├── README.md
+   │   └── requirements.txt
+   ├── main.py
+   └── .gitignore
+   ```
+
+### **Steps to Run the Framework**
+
+1. **Activate Your Python Environment (Optional)**:
+   It's a good practice to create a virtual environment for your project to manage dependencies.
+   
+   - To create a virtual environment, run:
+     ```bash
+     python -m venv venv
+     ```
+   - Activate the virtual environment:
+     - **On Windows**:
+       ```bash
+       venv\Scripts\activate
+       ```
+     - **On macOS/Linux**:
+       ```bash
+       source venv/bin/activate
+       ```
+
+2. **Install Dependencies** (if not already done):
+   If you haven't installed the required dependencies yet, run:
+   ```bash
+   pip install -r docs/requirements.txt
+   ```
+
+3. **Run the ETL Pipeline**:
+   To execute the entire ETL pipeline, simply run the `main.py` script using Python. In your terminal, navigate to the root directory of your project and execute:
+   ```bash
+   python main.py
+   ```
+
+   This will:
+   - Start the ETL pipeline.
+   - Extract data from the `census.csv`.
+   - Transform the data (process it and perform SQL queries).
+   - Load the transformed data into the database.
+   - Generate a markdown report (`census_report.md`) and a plot (`pop_change_plot.png`).
+   - Save the output files in the `results/` directory.
+
+4. **Check the Results**:
+   After running the pipeline:
+   - **Reports**: A markdown report will be generated as `census_report.md` in the `results/` directory.
+   - **Plots**: A bar chart plot (`pop_change_plot.png`) showing the population change will be saved in the `results/` directory.
+
+5. **Optional - Running Tests**:
+   If you have created test cases in the `tests/` directory, you can run the tests to validate the code. If you are using `pytest`:
+   ```bash
+   pytest tests/
+   ```
 
 ---
+
+### **Summary**
+- Ensure your project files are correctly set up (database, CSV file, code files).
+- Install all necessary dependencies.
+- Run the `main.py` script to execute the ETL pipeline.
+- Check the `results/` directory for the generated report and plot.
+
 
 ## 📊 Sample Output
 
