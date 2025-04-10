@@ -9,13 +9,26 @@ This project implements a complete ETL (Extract, Transform, Load) pipeline for a
 
 ```
 .
+.
+├── src/
+│   ├── __init__.py             # Init for package
+│   ├── config.py               # DB configuration
+│   ├── database.py             # Connection logic
+│   ├── analysis.py             # Data processing/transform logic
+│   └── visualization.py        # Charting and plotting
+├── tests/
+│   ├── __init__.py
+│   ├── test_database.py        # Unit tests for DB connection
+│   └── test_analysis.py        # Unit tests for analysis
 ├── data/
-│   ├── census.csv
-│   └── census.sqlite
-├── census_report.md
-├── pop_change_plot.png
-├── etl_pipeline.py
-└── README.md
+│   └── README.md               # Notes on data format & usage
+├── docs/
+│   ├── README.md               # Project overview
+│   └── requirements.txt        # Dependencies
+├── main.py                     # Entry point for running the pipeline
+├── .gitignore
+├── LICENSE
+└── README.md                   
 ```
 
 ---
