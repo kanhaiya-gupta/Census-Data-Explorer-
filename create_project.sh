@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Project name and root directory
-#PROJECT_NAME="census-data-explorer"
-#mkdir -p $PROJECT_NAME
+PROJECT_NAME="census-data-explorer"
+mkdir -p $PROJECT_NAME
 
 # Navigate into the project directory
-#cd $PROJECT_NAME
+cd $PROJECT_NAME
 
 # Create directory structure
 mkdir -p src tests data docs
@@ -14,13 +14,16 @@ mkdir -p src tests data docs
 touch src/__init__.py
 touch src/config.py
 touch src/database.py
-touch src/analysis.py
+touch src/transform.py
+touch src/load.py
 touch src/visualization.py
 
 # Create files in tests/
 touch tests/__init__.py
 touch tests/test_database.py
-touch tests/test_analysis.py
+touch tests/test_transform.py
+touch tests/test_load.py
+touch tests/test_visualization.py
 
 # Create data directory and README
 touch data/README.md
@@ -35,17 +38,17 @@ touch docs/requirements.txt
 cat <<EOL > docs/README.md
 # Census Data Explorer
 
-A Python project to explore and analyze data from a PostgreSQL census database.
+A Python project to explore and analyze census data from a database.
 
 ## Setup
 1. Install dependencies: \`pip install -r docs/requirements.txt\`
-2. Configure the database URL in \`src/config.py\`.
-3. Run the app: \`python main.py\`
+2. Configure the database connection in \`src/config.py\`.
+3. Run the pipeline: \`python main.py\`
 
 ## Features
-- Connect to a PostgreSQL database.
-- Query and analyze census data.
-- Visualize results (optional).
+- Connect to the database.
+- Extract, Transform, and Load (ETL) census data.
+- Generate analysis and visualizations.
 EOL
 
 # Populate docs/requirements.txt with basic dependencies
@@ -61,16 +64,7 @@ touch main.py
 touch .gitignore
 touch LICENSE
 
-# Populate main.py with a basic example
-cat <<EOL > main.py
-from src.database import connect_to_db
 
-def main():
-    engine = connect_to_db()
-    print("Connected to the census database!")
-
-if __name__ == "__main__":
-    main()
 EOL
 
 # Populate .gitignore with common Python ignores
@@ -115,24 +109,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 EOL
 
-# Add some placeholder content to src/config.py
-cat <<EOL > src/config.py
-# Database configuration
-DATABASE_URL = "postgresql+psycopg2://student:datacamp@postgresql.csrrinzqubik.us-east-1.rds.amazonaws.com:5432/census"
-EOL
 
-# Add some placeholder content to src/database.py
-cat <<EOL > src/database.py
-from sqlalchemy import create_engine
-from src.config import DATABASE_URL
 
-def connect_to_db():
-    engine = create_engine(DATABASE_URL)
-    return engine
-EOL
-
-# Set executable permissions for the main script (optional)
-chmod +x main.py
-
-echo "Project structure for '$PROJECT_NAME' created successfully!"
-```
+echo "Project structure created successfully!"
