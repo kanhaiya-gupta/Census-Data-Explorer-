@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: load-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: load
+  template:
+    metadata:
+      labels:
+        app: load
+    spec:
+      containers:
+      - name: load
+        image: localhost:5001/etl-load:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DB_PATH
+          value: "/data/census.sqlite"
+        - name: RESULTS_DIR
+          value: "/results"
+        volumeMounts:
+        - name: data-volume
+          mountPath: /data
+        - name: results-volume
+          mountPath: /results
+      volumes:
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: etl-data-pvc
+      - name: results-volume
+        persistentVolumeClaim:
+          claimName: etl-data-pvc

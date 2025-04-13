@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transform-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: transform
+  template:
+    metadata:
+      labels:
+        app: transform
+    spec:
+      containers:
+      - name: transform
+        image: localhost:5001/etl-transform:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DB_PATH
+          value: "/data/census.sqlite"
+        - name: CSV_PATH
+          value: "/data/census.csv"
+        volumeMounts:
+        - name: data-volume
+          mountPath: /data
+      volumes:
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: etl-data-pvc

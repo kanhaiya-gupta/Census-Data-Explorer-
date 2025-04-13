@@ -1,0 +1,18 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: etl-pipeline-job
+spec:
+  template:
+    spec:
+      containers:
+      - name: main
+        image: localhost:5001/etl-main:latest
+        env:
+        - name: DATABASE_SERVICE
+          value: "http://database-service:8000"
+        - name: TRANSFORM_SERVICE
+          value: "http://transform-service:8000"
+        - name: LOAD_SERVICE
+          value: "http://load-service:8000"
+      restartPolicy: OnFailure
