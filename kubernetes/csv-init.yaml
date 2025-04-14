@@ -1,0 +1,29 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: csv-init
+  namespace: census
+spec:
+  template:
+    spec:
+      containers:
+      - name: init
+        image: busybox
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          echo "age,gender,population" > /data/census.csv
+          echo "25,male,1000" >> /data/census.csv
+          echo "30,female,1200" >> /data/census.csv
+          echo "35,male,1100" >> /data/census.csv
+          echo "40,female,1300" >> /data/census.csv
+          chmod 666 /data/census.csv
+        volumeMounts:
+        - name: data-volume
+          mountPath: /data
+      volumes:
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: census-pvc
+      restartPolicy: Never
+  backoffLimit: 4 

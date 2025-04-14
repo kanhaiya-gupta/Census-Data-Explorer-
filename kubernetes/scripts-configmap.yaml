@@ -1,0 +1,356 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: census-scripts
+  namespace: census
+data:
+  database.py: |
+    import logging
+    from fastapi import FastAPI, HTTPException
+    from sqlalchemy import create_engine, text, MetaData
+    import os
+
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    app = FastAPI()
+    engine = None
+
+    def init_db():
+        global engine
+        try:
+            db_path = os.getenv('DB_PATH', '/data/census.sqlite')
+            logger.info(f"Initializing database connection to {db_path}")
+            
+            if not os.path.exists(db_path):
+                raise RuntimeError(f"Database file not found: {db_path}")
+            
+            # Check file permissions
+            file_stat = os.stat(db_path)
+            logger.info(f"File permissions: {file_stat.st_mode}")
+            logger.info(f"File owner: {file_stat.st_uid}")
+            logger.info(f"File group: {file_stat.st_gid}")
+            
+            # Ensure file is readable and writable
+            if not os.access(db_path, os.R_OK | os.W_OK):
+                raise RuntimeError(f"Database file not readable/writable: {db_path}")
+            
+            logger.info(f"Attempting to connect to {db_path}")
+            sqlite_url = f"sqlite:///{db_path}"
+            logger.info(f"Using SQLite URL: {sqlite_url}")
+            engine = create_engine(sqlite_url)
+            logger.info("Database connection established successfully")
+            
+            # Test connection by listing tables
+            with engine.connect() as conn:
+                result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"))
+                tables = [row[0] for row in result]
+                logger.info(f"Tables found: {tables}")
+                if not tables:
+                    raise ValueError("No tables found in the database")
+            
+            logger.info("Database initialized successfully")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize database: {str(e)}")
+            raise
+
+    @app.get("/health")
+    async def health_check():
+        try:
+            if not engine:
+                init_db()
+            
+            with engine.connect() as conn:
+                result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"))
+                tables = [row[0] for row in result]
+                logger.info(f"Found tables: {tables}")
+                if not tables:
+                    raise ValueError("No tables found in the database")
+                return {"status": "healthy", "tables": tables}
+        except Exception as e:
+            logger.error(f"Health check failed: {str(e)}")
+            raise HTTPException(status_code=503, detail=str(e))
+
+    if __name__ == "__main__":
+        import uvicorn
+        init_db()  # Initialize database before starting the server
+        uvicorn.run(app, host="0.0.0.0", port=8000)
+
+  transform.py: |
+    import pandas as pd
+    import sqlite3
+    import json
+    import logging
+    from fastapi import FastAPI, HTTPException
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.exc import SQLAlchemyError
+    import os
+
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    app = FastAPI()
+
+    class DatabaseConnection:
+        def __init__(self, db_path: str):
+            self.db_path = db_path
+            self.engine = None
+
+        def connect(self):
+            try:
+                if not os.path.exists(self.db_path):
+                    raise RuntimeError(f"Database file not found: {self.db_path}")
+                
+                # Check file permissions
+                file_stat = os.stat(self.db_path)
+                logger.info(f"File permissions: {file_stat.st_mode}")
+                logger.info(f"File owner: {file_stat.st_uid}")
+                logger.info(f"File group: {file_stat.st_gid}")
+                
+                # Ensure file is readable and writable
+                if not os.access(self.db_path, os.R_OK | os.W_OK):
+                    raise RuntimeError(f"Database file not readable/writable: {self.db_path}")
+                
+                logger.info(f"Attempting to connect to {self.db_path}")
+                sqlite_url = f"sqlite:///{self.db_path}"
+                logger.info(f"Using SQLite URL: {sqlite_url}")
+                self.engine = create_engine(sqlite_url)
+                logger.info("Database connection established successfully")
+            except Exception as e:
+                logger.error(f"Failed to connect to database: {str(e)}")
+                raise
+
+    class DataTransformer:
+        def __init__(self, db_path: str, csv_path: str, output_path: str):
+            self.db_path = db_path
+            self.csv_path = csv_path
+            self.output_path = output_path
+            self.db = DatabaseConnection(db_path)
+
+        def transform_data(self):
+            try:
+                # Connect to database
+                self.db.connect()
+                
+                # Read CSV file
+                if not os.path.exists(self.csv_path):
+                    raise RuntimeError(f"CSV file not found: {self.csv_path}")
+                
+                df = pd.read_csv(self.csv_path)
+                
+                # Calculate average age
+                avg_age = df['age'].mean()
+                
+                # Calculate percent female
+                total = len(df)
+                female_count = len(df[df['gender'] == 'female'])
+                percent_female = (female_count / total) * 100
+                
+                # Calculate population change
+                population_change = df['population'].diff().mean()
+                
+                # Create transformed data
+                transformed_data = {
+                    'average_age': avg_age,
+                    'percent_female': percent_female,
+                    'population_change': population_change
+                }
+                
+                # Save to JSON
+                with open(self.output_path, 'w') as f:
+                    json.dump(transformed_data, f)
+                
+                return transformed_data
+                
+            except Exception as e:
+                logger.error(f"Error during transformation: {str(e)}")
+                raise
+
+    @app.post("/transform")
+    async def transform_data():
+        try:
+            db_path = os.getenv('DB_PATH', '/data/census.sqlite')
+            csv_path = os.getenv('CSV_PATH', '/data/census.csv')
+            output_path = os.getenv('TRANSFORMED_DATA_PATH', '/data/transformed_data.json')
+            
+            transformer = DataTransformer(db_path, csv_path, output_path)
+            result = transformer.transform_data()
+            
+            return {"status": "success", "data": result}
+            
+        except Exception as e:
+            logger.error(f"Error in transform endpoint: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    if __name__ == "__main__":
+        import uvicorn
+        uvicorn.run(app, host="0.0.0.0", port=8001)
+
+  load.py: |
+    import json
+    import logging
+    import os
+    import matplotlib.pyplot as plt
+    from fastapi import FastAPI, HTTPException
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.exc import SQLAlchemyError
+
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    app = FastAPI()
+
+    class DataLoader:
+        def __init__(self, db_path: str, transformed_data_path: str, results_dir: str):
+            self.db_path = db_path
+            self.transformed_data_path = transformed_data_path
+            self.results_dir = results_dir
+            self.engine = None
+
+        def load_data(self):
+            try:
+                # Connect to database
+                if not os.path.exists(self.db_path):
+                    raise RuntimeError(f"Database file not found: {self.db_path}")
+                
+                logger.info(f"Connecting to database at {self.db_path}")
+                self.engine = create_engine(f"sqlite:///{self.db_path}")
+                
+                # Read transformed data
+                if not os.path.exists(self.transformed_data_path):
+                    raise RuntimeError(f"Transformed data file not found: {self.transformed_data_path}")
+                
+                with open(self.transformed_data_path, 'r') as f:
+                    transformed_data = json.load(f)
+                
+                # Create visualizations
+                self._create_visualizations(transformed_data)
+                
+                return transformed_data
+                
+            except Exception as e:
+                logger.error(f"Error during data loading: {str(e)}")
+                raise
+
+        def _create_visualizations(self, data):
+            try:
+                # Create directory if it doesn't exist
+                os.makedirs(self.results_dir, exist_ok=True)
+                
+                # Create age distribution plot
+                plt.figure(figsize=(10, 6))
+                plt.bar(['Average Age'], [data['average_age']])
+                plt.title('Average Age Distribution')
+                plt.ylabel('Age')
+                plt.savefig(os.path.join(self.results_dir, 'age_distribution.png'))
+                plt.close()
+                
+                # Create gender distribution plot
+                plt.figure(figsize=(10, 6))
+                plt.pie([data['percent_female'], 100 - data['percent_female']],
+                       labels=['Female', 'Male'],
+                       autopct='%1.1f%%')
+                plt.title('Gender Distribution')
+                plt.savefig(os.path.join(self.results_dir, 'gender_distribution.png'))
+                plt.close()
+                
+                # Create population change plot
+                plt.figure(figsize=(10, 6))
+                plt.bar(['Population Change'], [data['population_change']])
+                plt.title('Population Change')
+                plt.ylabel('Change')
+                plt.savefig(os.path.join(self.results_dir, 'population_change.png'))
+                plt.close()
+                
+            except Exception as e:
+                logger.error(f"Error creating visualizations: {str(e)}")
+                raise
+
+    @app.post("/load")
+    async def load_data():
+        try:
+            db_path = os.getenv('DB_PATH', '/data/census.sqlite')
+            transformed_data_path = os.getenv('TRANSFORMED_DATA_PATH', '/data/transformed_data.json')
+            results_dir = os.getenv('RESULTS_DIR', '/results')
+            
+            loader = DataLoader(db_path, transformed_data_path, results_dir)
+            result = loader.load_data()
+            
+            return {"status": "success", "data": result}
+            
+        except Exception as e:
+            logger.error(f"Error in load endpoint: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    if __name__ == "__main__":
+        import uvicorn
+        uvicorn.run(app, host="0.0.0.0", port=8002)
+
+  main.py: |
+    import os
+    import logging
+    import requests
+    from fastapi import FastAPI, HTTPException
+    import uvicorn
+
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    app = FastAPI()
+
+    class ETLPipeline:
+        def __init__(self):
+            self.database_service = os.getenv('DATABASE_SERVICE', 'http://census-database:8000')
+            self.transform_service = os.getenv('TRANSFORM_SERVICE', 'http://census-transform:8001')
+            self.load_service = os.getenv('LOAD_SERVICE', 'http://census-load:8002')
+            self.results_dir = os.getenv('RESULTS_DIR', '/results')
+
+        async def run_pipeline(self):
+            try:
+                # Step 1: Check database connection
+                logger.info("Checking database connection...")
+                db_response = requests.get(f"{self.database_service}/health")
+                if db_response.status_code != 200:
+                    raise RuntimeError("Database service is not ready")
+
+                # Step 2: Transform data
+                logger.info("Transforming data...")
+                transform_response = requests.post(f"{self.transform_service}/transform")
+                if transform_response.status_code != 200:
+                    raise RuntimeError("Data transformation failed")
+                transform_data = transform_response.json()
+
+                # Step 3: Load and visualize data
+                logger.info("Loading and visualizing data...")
+                load_response = requests.post(f"{self.load_service}/load")
+                if load_response.status_code != 200:
+                    raise RuntimeError("Data loading failed")
+                load_data = load_response.json()
+
+                return {
+                    "status": "success",
+                    "transform_data": transform_data,
+                    "load_data": load_data
+                }
+
+            except Exception as e:
+                logger.error(f"Pipeline error: {str(e)}")
+                raise
+
+    @app.post("/run")
+    async def run_pipeline():
+        try:
+            pipeline = ETLPipeline()
+            result = await pipeline.run_pipeline()
+            return result
+        except Exception as e:
+            logger.error(f"Error in pipeline endpoint: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    if __name__ == "__main__":
+        uvicorn.run(app, host="0.0.0.0", port=8003) 

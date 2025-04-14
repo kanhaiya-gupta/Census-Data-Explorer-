@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: census-main
+  namespace: census
+  labels:
+    app: census
+    component: main
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: census
+      component: main
+  template:
+    metadata:
+      labels:
+        app: census
+        component: main
+    spec:
+      containers:
+      - name: main
+        image: localhost:5000/census-main:latest
+        imagePullPolicy: Always
+        env:
+        - name: DATABASE_SERVICE
+          value: "http://census-database:8000"
+        - name: TRANSFORM_SERVICE
+          value: "http://census-transform:8001"
+        - name: LOAD_SERVICE
+          value: "http://census-load:8002"
+        - name: RESULTS_DIR
+          value: "/results"
+        - name: DB_PATH
+          value: "/data/census.sqlite"
+        - name: CSV_PATH
+          value: "/data/census.csv"
+        - name: TRANSFORMED_DATA_PATH
+          value: "/data/transformed_data.json"
+        volumeMounts:
+        - name: data-volume
+          mountPath: /data
+        - name: results-volume
+          mountPath: /results
+        - name: scripts-volume
+          mountPath: /app/scripts
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+      volumes:
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: census-pvc
+      - name: results-volume
+        persistentVolumeClaim:
+          claimName: census-results-pvc
+      - name: scripts-volume
+        configMap:
+          name: census-scripts
+      restartPolicy: Always 

@@ -1,0 +1,336 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: census-scripts
+  namespace: census
+data:
+  database.py: |
+    import logging
+    from fastapi import FastAPI, HTTPException
+    from sqlalchemy import create_engine, text, MetaData, Table, Column, Integer, String, Float
+    from sqlalchemy.ext.declarative import declarative_base
+    from sqlalchemy.orm import sessionmaker
+    import os
+    from pydantic import BaseModel
+    from typing import List, Optional
+
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    app = FastAPI()
+    DB_PATH = os.getenv("DB_PATH", "/data/census.sqlite")
+    engine = None
+    SessionLocal = None
+    Base = declarative_base()
+
+    class Census(Base):
+        __tablename__ = "census"
+        id = Column(Integer, primary_key=True)
+        year = Column(Integer)
+        state = Column(String)
+        population = Column(Integer)
+        households = Column(Integer)
+        median_income = Column(Float)
+
+    class CensusData(BaseModel):
+        id: Optional[int]
+        year: int
+        state: str
+        population: int
+        households: int
+        median_income: float
+
+    def init_db():
+        global engine, SessionLocal
+        try:
+            logger.info(f"Initializing database connection to {DB_PATH}")
+            
+            if not os.path.exists(DB_PATH):
+                raise RuntimeError(f"Database file not found: {DB_PATH}")
+            
+            # Check file permissions
+            file_stat = os.stat(DB_PATH)
+            logger.info(f"File permissions: {file_stat.st_mode}")
+            logger.info(f"File owner: {file_stat.st_uid}")
+            logger.info(f"File group: {file_stat.st_gid}")
+            
+            # Ensure file is readable and writable
+            if not os.access(DB_PATH, os.R_OK | os.W_OK):
+                raise RuntimeError(f"Database file not readable/writable: {DB_PATH}")
+            
+            logger.info(f"Attempting to connect to {DB_PATH}")
+            sqlite_url = f"sqlite:///{DB_PATH}"
+            logger.info(f"Using SQLite URL: {sqlite_url}")
+            engine = create_engine(sqlite_url)
+            SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+            
+            # Create tables if they don't exist
+            Base.metadata.create_all(bind=engine)
+            
+            logger.info("Database initialized successfully")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize database: {str(e)}")
+            raise
+
+    @app.on_event("startup")
+    async def startup():
+        init_db()
+
+    @app.get("/health")
+    async def health():
+        return {"status": "healthy"}
+
+    @app.post("/data")
+    async def add_data(data: CensusData):
+        try:
+            session = SessionLocal()
+            census = Census(
+                year=data.year,
+                state=data.state,
+                population=data.population,
+                households=data.households,
+                median_income=data.median_income
+            )
+            session.add(census)
+            session.commit()
+            return {"message": "Data added successfully"}
+        except Exception as e:
+            logger.error(f"Error adding data: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
+        finally:
+            session.close()
+
+    if __name__ == "__main__":
+        import uvicorn
+        uvicorn.run(app, host="0.0.0.0", port=8000)
+
+  transform.py: |
+    import pandas as pd
+    import json
+    import os
+    from fastapi import FastAPI, HTTPException
+    from pydantic import BaseModel
+    from typing import List, Dict
+
+    app = FastAPI()
+    CSV_PATH = os.getenv("CSV_PATH", "/data/census.csv")
+    TRANSFORMED_DATA_PATH = os.getenv("TRANSFORMED_DATA_PATH", "/data/transformed_data.json")
+
+    class TransformRequest(BaseModel):
+        year: int
+        state: str
+
+    @app.get("/health")
+    async def health():
+        return {"status": "healthy"}
+
+    @app.post("/transform")
+    async def transform(request: TransformRequest):
+        try:
+            # Read CSV file
+            df = pd.read_csv(CSV_PATH)
+            
+            # Filter data
+            filtered_data = df[(df['year'] == request.year) & (df['state'] == request.state)]
+            
+            if filtered_data.empty:
+                raise HTTPException(status_code=404, detail="No data found for the specified year and state")
+            
+            # Convert to dictionary
+            result = filtered_data.to_dict(orient='records')[0]
+            
+            # Save transformed data
+            with open(TRANSFORMED_DATA_PATH, 'w') as f:
+                json.dump(result, f)
+            
+            return result
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    if __name__ == "__main__":
+        import uvicorn
+        uvicorn.run(app, host="0.0.0.0", port=8001)
+
+  load.py: |
+    import json
+    import os
+    import logging
+    from fastapi import FastAPI, HTTPException
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.ext.declarative import declarative_base
+    from sqlalchemy import Column, Integer, String, Float
+
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    app = FastAPI()
+    DB_PATH = os.getenv("DB_PATH", "/data/census.sqlite")
+    TRANSFORMED_DATA_PATH = os.getenv("TRANSFORMED_DATA_PATH", "/data/transformed_data.json")
+    RESULTS_DIR = os.getenv("RESULTS_DIR", "/results")
+
+    Base = declarative_base()
+    engine = None
+    SessionLocal = None
+
+    class Census(Base):
+        __tablename__ = "census"
+        id = Column(Integer, primary_key=True)
+        year = Column(Integer)
+        state = Column(String)
+        population = Column(Integer)
+        households = Column(Integer)
+        median_income = Column(Float)
+
+    def init_db():
+        global engine, SessionLocal
+        try:
+            logger.info(f"Initializing database connection to {DB_PATH}")
+            
+            if not os.path.exists(DB_PATH):
+                raise RuntimeError(f"Database file not found: {DB_PATH}")
+            
+            # Check file permissions
+            file_stat = os.stat(DB_PATH)
+            logger.info(f"File permissions: {file_stat.st_mode}")
+            logger.info(f"File owner: {file_stat.st_uid}")
+            logger.info(f"File group: {file_stat.st_gid}")
+            
+            # Ensure file is readable and writable
+            if not os.access(DB_PATH, os.R_OK | os.W_OK):
+                raise RuntimeError(f"Database file not readable/writable: {DB_PATH}")
+            
+            logger.info(f"Attempting to connect to {DB_PATH}")
+            sqlite_url = f"sqlite:///{DB_PATH}"
+            logger.info(f"Using SQLite URL: {sqlite_url}")
+            engine = create_engine(sqlite_url)
+            SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+            
+            # Create tables if they don't exist
+            Base.metadata.create_all(bind=engine)
+            
+            logger.info("Database initialized successfully")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize database: {str(e)}")
+            raise
+
+    @app.on_event("startup")
+    async def startup():
+        init_db()
+
+    @app.get("/health")
+    async def health():
+        return {"status": "healthy"}
+
+    @app.post("/load")
+    async def load_data():
+        try:
+            # Read transformed data
+            if not os.path.exists(TRANSFORMED_DATA_PATH):
+                raise HTTPException(status_code=404, detail="Transformed data not found")
+            
+            with open(TRANSFORMED_DATA_PATH, 'r') as f:
+                data = json.load(f)
+            
+            # Save to database
+            session = SessionLocal()
+            try:
+                census = Census(
+                    year=data['year'],
+                    state=data['state'],
+                    population=data['population'],
+                    households=data['households'],
+                    median_income=data['median_income']
+                )
+                session.add(census)
+                session.commit()
+            finally:
+                session.close()
+            
+            return {"message": "Data loaded successfully"}
+        except Exception as e:
+            logger.error(f"Error loading data: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    if __name__ == "__main__":
+        import uvicorn
+        uvicorn.run(app, host="0.0.0.0", port=8002)
+
+  main.py: |
+    import requests
+    import os
+    import json
+    from fastapi import FastAPI, HTTPException
+    from pydantic import BaseModel
+
+    app = FastAPI()
+    DATABASE_SERVICE = os.getenv("DATABASE_SERVICE", "http://database:8000")
+    TRANSFORM_SERVICE = os.getenv("TRANSFORM_SERVICE", "http://transform:8001")
+    LOAD_SERVICE = os.getenv("LOAD_SERVICE", "http://load:8002")
+    RESULTS_DIR = os.getenv("RESULTS_DIR", "/results")
+
+    class ETLRequest(BaseModel):
+        year: int
+        state: str
+
+    @app.get("/health")
+    async def health():
+        return {"status": "healthy"}
+
+    @app.post("/run")
+    async def run_etl(request: ETLRequest):
+        try:
+            # Check if database service is ready
+            db_health = requests.get(f"{DATABASE_SERVICE}/health")
+            if db_health.status_code != 200:
+                raise HTTPException(status_code=503, detail="Database service is not ready")
+            
+            # Transform data
+            transform_response = requests.post(
+                f"{TRANSFORM_SERVICE}/transform",
+                json={"year": request.year, "state": request.state}
+            )
+            if transform_response.status_code != 200:
+                raise HTTPException(status_code=500, detail="Transform failed")
+            
+            # Load data
+            load_response = requests.post(f"{LOAD_SERVICE}/load")
+            if load_response.status_code != 200:
+                raise HTTPException(status_code=500, detail="Load failed")
+            
+            # Save results
+            os.makedirs(RESULTS_DIR, exist_ok=True)
+            with open(os.path.join(RESULTS_DIR, 'etl_results.json'), 'w') as f:
+                json.dump({
+                    "status": "success",
+                    "message": "ETL process completed successfully",
+                    "year": request.year,
+                    "state": request.state
+                }, f)
+            
+            return {"status": "success", "message": "ETL process completed successfully"}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    if __name__ == "__main__":
+        import uvicorn
+        uvicorn.run(app, host="0.0.0.0", port=8003)
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: census-data
+  namespace: census
+data:
+  census.csv: |
+    year,state,population,households,median_income
+    2020,California,39538223,13700000,78700
+    2020,Texas,29145505,10000000,64000
+    2020,Florida,21538187,8000000,59000
+    2020,New York,20201249,7000000,72000
+    2020,Pennsylvania,13002700,5000000,63000 

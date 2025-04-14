@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: census-data
+  namespace: census
+data:
+  census.csv: |
+    year,state,population,households,median_income
+    2020,California,39538223,13700000,75000.0
+    2020,Texas,29145505,10000000,65000.0
+    2020,Florida,21538187,8000000,60000.0
+    2020,New York,20201249,7000000,70000.0 

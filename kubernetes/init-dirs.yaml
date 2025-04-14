@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: init-dirs
+  namespace: census
+spec:
+  containers:
+  - name: init
+    image: busybox
+    command: ["/bin/sh", "-c"]
+    args:
+    - |
+      mkdir -p /data/census /data/results;
+      chmod 777 /data/census /data/results;
+      echo "Directories created successfully";
+      sleep 3600
+    volumeMounts:
+    - name: data
+      mountPath: /data
+  volumes:
+  - name: data
+    hostPath:
+      path: /data
+      type: DirectoryOrCreate
+  nodeSelector:
+    kubernetes.io/hostname: etl-pipeline-cluster-worker
+  restartPolicy: Never 

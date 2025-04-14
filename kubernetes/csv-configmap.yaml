@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: census-data
+  namespace: census
+data:
+  census.csv: |
+    year,state,population,households,median_income,age,gender
+    2020,California,39538223,13157873,78672,35,male
+    2020,California,39538223,13157873,78672,42,female
+    2020,Texas,29145505,10261838,63826,28,male
+    2020,Texas,29145505,10261838,63826,45,female
+    2020,Florida,21538187,8336282,57703,39,male
+    2020,Florida,21538187,8336282,57703,41,female
+    2019,California,39144818,13044266,75235,37,male
+    2019,California,39144818,13044266,75235,40,female
+    2019,Texas,28995881,10261838,61874,29,male
+    2019,Texas,28995881,10261838,61874,44,female 

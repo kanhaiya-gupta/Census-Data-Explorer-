@@ -1,0 +1,25 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: results-init
+  namespace: census
+spec:
+  template:
+    spec:
+      containers:
+      - name: init
+        image: busybox
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          mkdir -p /results
+          chmod 777 /results
+        volumeMounts:
+        - name: results-volume
+          mountPath: /results
+      volumes:
+      - name: results-volume
+        persistentVolumeClaim:
+          claimName: census-results-pvc
+      restartPolicy: Never
+  backoffLimit: 4 
