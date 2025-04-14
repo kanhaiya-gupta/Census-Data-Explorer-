@@ -1,30 +1,44 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: database-deployment
+  name: census-database
+  namespace: census
+  labels:
+    app: census
+    component: database
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: database
+      app: census
+      component: database
   template:
     metadata:
       labels:
-        app: database
+        app: census
+        component: database
     spec:
       containers:
       - name: database
-        image: localhost:5001/etl-database:latest
-        imagePullPolicy: IfNotPresent
+        image: localhost:5000/census-database:latest
+        imagePullPolicy: Always
         env:
         - name: DB_PATH
-          value: /data/census.sqlite
+          value: "/data/census.sqlite"
         ports:
         - containerPort: 8000
         volumeMounts:
-        - name: data
+        - name: data-volume
           mountPath: /data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
       volumes:
-      - name: data
+      - name: data-volume
         persistentVolumeClaim:
-          claimName: etl-data-pvc
+          claimName: census-pvc
+      restartPolicy: Always

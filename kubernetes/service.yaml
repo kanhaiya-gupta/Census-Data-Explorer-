@@ -1,35 +1,79 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: database-service
+  name: census-database
+  namespace: census
+  labels:
+    app: census
+    component: database
 spec:
-  selector:
-    app: database
+  type: NodePort
   ports:
-  - protocol: TCP
-    port: 8000
+  - port: 8000
     targetPort: 8000
+    nodePort: 30000
+    protocol: TCP
+    name: http
+  selector:
+    app: census
+    component: database
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: transform-service
+  name: census-transform
+  namespace: census
+  labels:
+    app: census
+    component: transform
 spec:
-  selector:
-    app: transform
+  type: NodePort
   ports:
-  - protocol: TCP
-    port: 8000
-    targetPort: 8000
+  - port: 8001
+    targetPort: 8001
+    nodePort: 30001
+    protocol: TCP
+    name: http
+  selector:
+    app: census
+    component: transform
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: load-service
+  name: census-load
+  namespace: census
+  labels:
+    app: census
+    component: load
 spec:
-  selector:
-    app: load
+  type: NodePort
   ports:
-  - protocol: TCP
-    port: 8000
-    targetPort: 8000
+  - port: 8002
+    targetPort: 8002
+    nodePort: 30002
+    protocol: TCP
+    name: http
+  selector:
+    app: census
+    component: load
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: census-main
+  namespace: census
+  labels:
+    app: census
+    component: main
+spec:
+  type: NodePort
+  ports:
+  - port: 8003
+    targetPort: 8003
+    nodePort: 30003
+    protocol: TCP
+    name: http
+  selector:
+    app: census
+    component: main

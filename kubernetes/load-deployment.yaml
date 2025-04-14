@@ -1,39 +1,56 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: load-deployment
+  name: census-load
+  namespace: census
+  labels:
+    app: census
+    component: load
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: load
+      app: census
+      component: load
   template:
     metadata:
       labels:
-        app: load
+        app: census
+        component: load
     spec:
       containers:
       - name: load
-        image: localhost:5001/etl-load:latest
-        imagePullPolicy: IfNotPresent
+        image: localhost:5000/census-load:latest
+        imagePullPolicy: Always
         env:
         - name: DB_PATH
-          value: /data/census.sqlite
-        - name: RESULTS_DIR
-          value: /results
+          value: "/data/census.sqlite"
         - name: TRANSFORMED_DATA_PATH
-          value: /data/transformed_data.json
-        ports:
-        - containerPort: 8000
+          value: "/data/transformed_data.json"
+        - name: RESULTS_DIR
+          value: "/results"
         volumeMounts:
-        - name: data
+        - name: data-volume
           mountPath: /data
-        - name: results
+        - name: results-volume
           mountPath: /results
+        - name: scripts-volume
+          mountPath: /app/scripts
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
       volumes:
-      - name: data
+      - name: data-volume
         persistentVolumeClaim:
-          claimName: etl-data-pvc
-      - name: results
+          claimName: census-pvc
+      - name: results-volume
         persistentVolumeClaim:
-          claimName: etl-data-pvc
+          claimName: census-results-pvc
+      - name: scripts-volume
+        configMap:
+          name: census-scripts
+      restartPolicy: Always

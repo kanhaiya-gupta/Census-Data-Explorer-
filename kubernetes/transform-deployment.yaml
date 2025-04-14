@@ -1,34 +1,56 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: transform-deployment
+  name: census-transform
+  namespace: census
+  labels:
+    app: census
+    component: transform
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: transform
+      app: census
+      component: transform
   template:
     metadata:
       labels:
-        app: transform
+        app: census
+        component: transform
     spec:
       containers:
       - name: transform
-        image: localhost:5001/etl-transform:latest
-        imagePullPolicy: IfNotPresent
+        image: localhost:5000/census-transform:latest
+        imagePullPolicy: Always
         env:
         - name: DB_PATH
-          value: /data/census.sqlite
+          value: "/data/census.sqlite"
         - name: CSV_PATH
-          value: /data/census.csv
+          value: "/data/input/census.csv"
         - name: TRANSFORMED_DATA_PATH
-          value: /data/transformed_data.json
-        ports:
-        - containerPort: 8000
+          value: "/data/transformed_data.json"
         volumeMounts:
-        - name: data
+        - name: data-volume
           mountPath: /data
+        - name: scripts-volume
+          mountPath: /app/scripts
+        - name: census-data
+          mountPath: /data/input
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
       volumes:
-      - name: data
+      - name: data-volume
         persistentVolumeClaim:
-          claimName: etl-data-pvc
+          claimName: census-pvc
+      - name: scripts-volume
+        configMap:
+          name: census-scripts
+      - name: census-data
+        configMap:
+          name: census-data
+      restartPolicy: Always
