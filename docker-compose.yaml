@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  database:
+    image: census-database
+    build:
+      context: .
+      dockerfile: docker/database/Dockerfile
+    volumes:
+      - ./data:/data:rw
+    environment:
+      - DB_PATH=/data/census.sqlite
+    command: >
+      sh -c "
+        chmod 666 /data/census.sqlite;
+        python -m scripts.database
+      "
+    ports:
+      - "8000:8000"
+    networks:
+      - census-net
+
+  transform:
+    image: census-transform
+    build:
+      context: .
+      dockerfile: docker/transform/Dockerfile
+    volumes:
+      - ./data:/data:rw
+      - ./scripts:/app/scripts
+    environment:
+      - DB_PATH=/data/census.sqlite
+      - CSV_PATH=/data/census.csv
+      - TRANSFORMED_DATA_PATH=/data/transformed_data.json
+    command: >
+      sh -c "
+        chmod 666 /data/census.sqlite;
+        chmod 666 /data/census.csv;
+        python -m scripts.transform
+      "
+    ports:
+      - "8001:8001"
+    depends_on:
+      - database
+    networks:
+      - census-net
+
+  load:
+    image: census-load
+    build:
+      context: .
+      dockerfile: docker/load/Dockerfile
+    volumes:
+      - ./data:/data:rw
+      - ./results:/results:rw
+      - ./scripts:/app/scripts
+    environment:
+      - DB_PATH=/data/census.sqlite
+      - TRANSFORMED_DATA_PATH=/data/transformed_data.json
+      - RESULTS_DIR=/results
+    command: >
+      sh -c "
+        chmod 666 /data/census.sqlite;
+        chmod 777 /results;
+        python -m scripts.load
+      "
+    ports:
+      - "8002:8002"
+    depends_on:
+      - database
+    networks:
+      - census-net
+
+  main:
+    image: census-main
+    build:
+      context: .
+      dockerfile: docker/main/Dockerfile
+    volumes:
+      - ./data:/data:rw
+      - ./results:/results:rw
+      - ./scripts:/app/scripts
+    environment:
+      - DATABASE_SERVICE=http://database:8000
+      - TRANSFORM_SERVICE=http://transform:8001
+      - LOAD_SERVICE=http://load:8002
+      - RESULTS_DIR=/results
+      - DB_PATH=/data/census.sqlite
+      - CSV_PATH=/data/census.csv
+      - TRANSFORMED_DATA_PATH=/data/transformed_data.json
+    command: >
+      sh -c "
+        chmod 666 /data/census.sqlite;
+        chmod 666 /data/census.csv;
+        chmod 777 /results;
+        python -m scripts.main
+      "
+    ports:
+      - "8003:8003"
+    depends_on:
+      - database
+      - transform
+      - load
+    networks:
+      - census-net
+
+networks:
+  census-net:
+    driver: bridge
