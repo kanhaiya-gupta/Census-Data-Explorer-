@@ -1,0 +1,247 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: census-scripts
+  namespace: census
+data:
+  __init__.py: ""
+  database.py: |
+    import os
+    import sqlite3
+    from fastapi import FastAPI, HTTPException
+    import logging
+
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    app = FastAPI()
+
+    def init_db():
+        db_path = os.environ.get('DB_PATH', '/data/census.sqlite')
+        logger.info(f"Initializing database connection to {db_path}")
+        
+        if not os.path.exists(db_path):
+            logger.error(f"Database file not found: {db_path}")
+            raise RuntimeError(f"Database file not found: {db_path}")
+        
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            
+            # Create tables if they don't exist
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS census (
+                    year INTEGER,
+                    state TEXT,
+                    population INTEGER,
+                    PRIMARY KEY (year, state)
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS state_fact (
+                    state TEXT PRIMARY KEY,
+                    capital TEXT,
+                    largest_city TEXT,
+                    established_date TEXT
+                )
+            ''')
+            
+            conn.commit()
+            conn.close()
+            logger.info("Database initialized successfully")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize database: {str(e)}")
+            raise
+    
+    @app.get("/health")
+    async def health():
+        return {"status": "healthy"}
+    
+    @app.get("/data")
+    async def get_data():
+        try:
+            conn = sqlite3.connect(os.environ.get('DB_PATH', '/data/census.sqlite'))
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM census")
+            data = cursor.fetchall()
+            conn.close()
+            return {"data": data}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    if __name__ == "__main__":
+        init_db()  # Initialize database before starting the server
+        import uvicorn
+        uvicorn.run(app, host="0.0.0.0", port=8000)
+
+  transform.py: |
+    import os
+    import json
+    import pandas as pd
+    from fastapi import FastAPI, HTTPException
+    import logging
+
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    app = FastAPI()
+
+    def transform_data():
+        csv_path = os.environ.get('CSV_PATH', '/data/census.csv')
+        output_path = os.environ.get('TRANSFORMED_DATA_PATH', '/data/transformed_data.json')
+        
+        try:
+            # Read CSV file
+            df = pd.read_csv(csv_path)
+            
+            # Transform data
+            transformed_data = df.to_dict(orient='records')
+            
+            # Save transformed data
+            with open(output_path, 'w') as f:
+                json.dump(transformed_data, f)
+                
+            return {"message": "Data transformed successfully"}
+            
+        except Exception as e:
+            logger.error(f"Error transforming data: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/health")
+    async def health():
+        return {"status": "healthy"}
+
+    @app.post("/transform")
+    async def transform():
+        return transform_data()
+
+    if __name__ == "__main__":
+        import uvicorn
+        uvicorn.run(app, host="0.0.0.0", port=8001)
+
+  load.py: |
+    import os
+    import json
+    import sqlite3
+    from fastapi import FastAPI, HTTPException
+    import logging
+
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    app = FastAPI()
+
+    def load_data():
+        db_path = os.environ.get('DB_PATH', '/data/census.sqlite')
+        data_path = os.environ.get('TRANSFORMED_DATA_PATH', '/data/transformed_data.json')
+        results_dir = os.environ.get('RESULTS_DIR', '/results')
+        
+        try:
+            # Read transformed data
+            with open(data_path, 'r') as f:
+                data = json.load(f)
+            
+            # Connect to database
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            
+            # Load data into database
+            for record in data:
+                cursor.execute(
+                    "INSERT OR REPLACE INTO census (year, state, population) VALUES (?, ?, ?)",
+                    (record['year'], record['state'], record['population'])
+                )
+            
+            conn.commit()
+            conn.close()
+            
+            # Save results
+            results = {
+                "records_processed": len(data),
+                "status": "success"
+            }
+            
+            with open(os.path.join(results_dir, 'load_results.json'), 'w') as f:
+                json.dump(results, f)
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error loading data: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/health")
+    async def health():
+        return {"status": "healthy"}
+
+    @app.post("/load")
+    async def load():
+        return load_data()
+
+    if __name__ == "__main__":
+        import uvicorn
+        uvicorn.run(app, host="0.0.0.0", port=8002)
+
+  main.py: |
+    import os
+    import json
+    import requests
+    from fastapi import FastAPI, HTTPException
+    import logging
+
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    app = FastAPI()
+
+    def get_service_url(service_name):
+        return os.environ.get(f'{service_name}_SERVICE')
+
+    @app.get("/health")
+    async def health():
+        return {"status": "healthy"}
+
+    @app.post("/process")
+    async def process():
+        try:
+            # Step 1: Transform data
+            transform_url = f"{get_service_url('TRANSFORM')}/transform"
+            transform_response = requests.post(transform_url)
+            transform_response.raise_for_status()
+            
+            # Step 2: Load data
+            load_url = f"{get_service_url('LOAD')}/load"
+            load_response = requests.post(load_url)
+            load_response.raise_for_status()
+            
+            # Step 3: Get data from database
+            database_url = f"{get_service_url('DATABASE')}/data"
+            database_response = requests.get(database_url)
+            database_response.raise_for_status()
+            
+            # Save results
+            results = {
+                "transform_status": transform_response.json(),
+                "load_status": load_response.json(),
+                "data_sample": database_response.json()["data"][:5]
+            }
+            
+            results_dir = os.environ.get('RESULTS_DIR', '/results')
+            with open(os.path.join(results_dir, 'etl_results.json'), 'w') as f:
+                json.dump(results, f)
+            
+            return results
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error in ETL process: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    if __name__ == "__main__":
+        import uvicorn
+        uvicorn.run(app, host="0.0.0.0", port=8003) 
