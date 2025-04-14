@@ -1,7 +1,26 @@
 #!/bin/bash
 set -e
 
+# Navigate to script's directory
 cd "$(dirname "$0")"
+
+# Configuration variables
+CLUSTER_NAME="etl-pipeline-cluster"
+REGISTRY_NAME="kind-registry"
+REGISTRY_PORT="5000"
+FORCE_REBUILD=${FORCE_REBUILD:-false}
+CLEANUP_CLUSTER=${CLEANUP_CLUSTER:-false}
+SERVICES=("database" "transform" "load" "main")
+IMAGE_PREFIX="census"
+IMAGE_TAG="latest"
+
+# Check for required tools
+for cmd in docker kind kubectl curl ss; do
+    if ! command -v "$cmd" &> /dev/null; then
+        echo "Error: $cmd is required but not installed."
+        exit 1
+    fi
+done
 
 # Check for required files and directories
 if [ ! -f "kubernetes/kind-config.yaml" ]; then
@@ -14,28 +33,30 @@ if [ ! -d "docker" ]; then
     exit 1
 fi
 
-# Check for required Dockerfiles
-for component in database transform load main; do
-    if [ ! -f "docker/$component/Dockerfile" ]; then
-        echo "Error: docker/$component/Dockerfile not found"
+for service in "${SERVICES[@]}"; do
+    if [ ! -f "docker/$service/Dockerfile" ]; then
+        echo "Error: docker/$service/Dockerfile not found"
         exit 1
     fi
 done
 
+# Clean up existing cluster if requested
+if [ "$CLEANUP_CLUSTER" = "true" ]; then
+    if kind get clusters | grep -q "$CLUSTER_NAME"; then
+        echo "Deleting existing Kind cluster '$CLUSTER_NAME'..."
+        kind delete cluster --name "$CLUSTER_NAME"
+    fi
+fi
+
 # Ensure Kind cluster exists
-CLUSTER_NAME="etl-pipeline-cluster"
 if ! kind get clusters | grep -q "$CLUSTER_NAME"; then
-    echo "Creating kind cluster '$CLUSTER_NAME'..."
+    echo "Creating Kind cluster '$CLUSTER_NAME'..."
     kind create cluster --name "$CLUSTER_NAME" --config kubernetes/kind-config.yaml
 else
     echo "Kind cluster '$CLUSTER_NAME' already exists."
 fi
 
 # Set up local registry
-REGISTRY_NAME="kind-registry"
-REGISTRY_PORT="5001"
-
-# Check and remove any non-running kind-registry containers
 if docker ps -a -q -f name="$REGISTRY_NAME" | grep -q .; then
     if ! docker ps -q -f name="$REGISTRY_NAME" | grep -q .; then
         echo "Removing non-running '$REGISTRY_NAME' container..."
@@ -43,12 +64,10 @@ if docker ps -a -q -f name="$REGISTRY_NAME" | grep -q .; then
     fi
 fi
 
-# Start registry if not running
 if ! docker ps -q -f name="$REGISTRY_NAME" | grep -q .; then
     echo "Starting local registry on port $REGISTRY_PORT..."
-    # Retry up to 3 times to handle transient failures
     for attempt in {1..3}; do
-        if docker run -d -p "$REGISTRY_PORT:5000" --name "$REGISTRY_NAME" --network kind registry:2; then
+        if docker run -d -p "$REGISTRY_PORT:$REGISTRY_PORT" --name "$REGISTRY_NAME" registry:2; then
             echo "Registry started successfully."
             break
         else
@@ -60,43 +79,58 @@ if ! docker ps -q -f name="$REGISTRY_NAME" | grep -q .; then
             exit 1
         fi
     done
-    docker network connect kind "$REGISTRY_NAME" || echo "Already connected"
+    # Connect to Kind network
+    if ! docker network connect kind "$REGISTRY_NAME" 2>/dev/null; then
+        echo "Registry already connected to kind network."
+    fi
 else
     echo "Local registry '$REGISTRY_NAME' already running."
 fi
 
-# Verify registry is accessible
-if ! curl -s http://localhost:$REGISTRY_PORT/v2/ > /dev/null; then
-    echo "Warning: Registry at localhost:$REGISTRY_PORT is not responding."
-fi
+# Verify registry
+echo "Verifying registry at http://localhost:$REGISTRY_PORT/v2/..."
+for attempt in {1..5}; do
+    if curl -s -f http://localhost:$REGISTRY_PORT/v2/ > /dev/null; then
+        echo "Registry is responding."
+        break
+    else
+        echo "Attempt $attempt: Registry not responding. Retrying in 5 seconds..."
+        sleep 5
+    fi
+    if [ $attempt -eq 5 ]; then
+        echo "Error: Registry at localhost:$REGISTRY_PORT is not responding after $attempt attempts."
+        exit 1
+    fi
+done
 
 # Function to build and push images
 build_image() {
-    local image_name="$1"
-    local dockerfile_path="$2"
-    local tag="localhost:$REGISTRY_PORT/$image_name"
-    if ! docker image inspect "$tag" > /dev/null 2>&1; then
-        echo "Building image: $tag"
-        docker build -t "$tag" -f "$dockerfile_path" .
+    local service="$1"
+    local dockerfile_path="docker/$service/Dockerfile"
+    local image_name="${IMAGE_PREFIX}-${service}:${IMAGE_TAG}"
+    local registry_image="localhost:${REGISTRY_PORT}/${image_name}"
+
+    # Build image
+    if [ "$FORCE_REBUILD" = "true" ] || ! docker image inspect "$registry_image" > /dev/null 2>&1; then
+        echo "Building image: $registry_image"
+        docker build -t "$registry_image" -f "$dockerfile_path" .
     else
-        echo "Image $tag already exists, skipping build."
+        echo "Image $registry_image already exists, skipping build."
     fi
-    echo "Pushing image: $tag"
-    docker push "$tag"
+
+    # Push image
+    echo "Pushing image: $registry_image"
+    docker push "$registry_image"
+
+    # Load into Kind
+    echo "Loading image into Kind cluster: $registry_image"
+    kind load docker-image "$registry_image" --name "$CLUSTER_NAME"
 }
 
-# Build and push Docker images
+# Build and push all images
 echo "Building and pushing Docker images..."
-build_image "etl-database:latest" "docker/database/Dockerfile"
-build_image "etl-transform:latest" "docker/transform/Dockerfile"
-build_image "etl-load:latest" "docker/load/Dockerfile"
-build_image "etl-main:latest" "docker/main/Dockerfile"
-
-# Load images into Kind cluster
-echo "Loading images into Kind cluster '$CLUSTER_NAME'..."
-kind load docker-image "localhost:$REGISTRY_PORT/etl-database:latest" --name "$CLUSTER_NAME"
-kind load docker-image "localhost:$REGISTRY_PORT/etl-transform:latest" --name "$CLUSTER_NAME"
-kind load docker-image "localhost:$REGISTRY_PORT/etl-load:latest" --name "$CLUSTER_NAME"
-kind load docker-image "localhost:$REGISTRY_PORT/etl-main:latest" --name "$CLUSTER_NAME"
+for service in "${SERVICES[@]}"; do
+    build_image "$service"
+done
 
 echo "All images have been built, pushed, and loaded successfully!"

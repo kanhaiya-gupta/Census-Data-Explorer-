@@ -15,22 +15,25 @@ spec:
       containers:
       - name: load
         image: localhost:5001/etl-load:latest
-        ports:
-        - containerPort: 8000
+        imagePullPolicy: IfNotPresent
         env:
         - name: DB_PATH
-          value: "/data/census.sqlite"
+          value: /data/census.sqlite
         - name: RESULTS_DIR
-          value: "/results"
+          value: /results
+        - name: TRANSFORMED_DATA_PATH
+          value: /data/transformed_data.json
+        ports:
+        - containerPort: 8000
         volumeMounts:
-        - name: data-volume
+        - name: data
           mountPath: /data
-        - name: results-volume
+        - name: results
           mountPath: /results
       volumes:
-      - name: data-volume
+      - name: data
         persistentVolumeClaim:
           claimName: etl-data-pvc
-      - name: results-volume
+      - name: results
         persistentVolumeClaim:
           claimName: etl-data-pvc

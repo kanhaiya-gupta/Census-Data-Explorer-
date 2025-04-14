@@ -8,6 +8,7 @@ spec:
       containers:
       - name: main
         image: localhost:5001/etl-main:latest
+        imagePullPolicy: IfNotPresent
         env:
         - name: DATABASE_SERVICE
           value: "http://database-service:8000"
@@ -15,4 +16,5 @@ spec:
           value: "http://transform-service:8000"
         - name: LOAD_SERVICE
           value: "http://load-service:8000"
-      restartPolicy: OnFailure
+      restartPolicy: Never
+  backoffLimit: 4

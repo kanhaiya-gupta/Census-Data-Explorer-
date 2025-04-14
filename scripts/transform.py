@@ -109,9 +109,9 @@ class DataTransformer:
 @app.post("/transform")
 async def transform_data():
     try:
-        db_path = os.getenv("DB_PATH", "data/census.sqlite")
-        csv_path = os.getenv("CSV_PATH", "data/census.csv")
-        output_file = os.getenv("TRANSFORMED_DATA_PATH", "data/transformed_data.json")
+        db_path = os.getenv("DB_PATH", "/data/census.sqlite")
+        csv_path = os.getenv("CSV_PATH", "/data/census.csv")
+        output_file = os.getenv("TRANSFORMED_DATA_PATH", "/data/transformed_data.json")
         
         if not os.path.exists(csv_path):
             logger.error(f"CSV file not found: {csv_path}")

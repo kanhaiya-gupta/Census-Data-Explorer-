@@ -1,8 +1,8 @@
 # Census Analysis Report
 
 ## Average Age by Gender
-- F: 37.02
-- M: 34.51
+- F: 37.00
+- M: 34.00
 
 ## Percentage Female by State
 - Alabama: 51.83%
@@ -58,13 +58,13 @@
 - Wyoming: 49.95%
 
 ## Top 10 States by Population Change
-- Texas: 3,383,317
-- California: 2,779,560
-- Florida: 2,281,569
-- Georgia: 1,460,732
-- Arizona: 1,336,836
-- North Carolina: 1,143,025
-- Virginia: 693,112
-- Washington: 638,917
-- Colorado: 612,070
-- Nevada: 577,131
+- Texas: 6,766,634
+- California: 5,559,120
+- Florida: 4,563,138
+- Georgia: 2,921,464
+- Arizona: 2,673,672
+- North Carolina: 2,286,050
+- Virginia: 1,386,224
+- Washington: 1,277,834
+- Colorado: 1,224,140
+- Nevada: 1,154,262
